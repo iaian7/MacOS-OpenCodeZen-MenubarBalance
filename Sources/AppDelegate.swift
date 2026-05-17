@@ -1,5 +1,6 @@
 import Cocoa
 import WebKit
+import ServiceManagement
 
 class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     var statusItem: NSStatusItem!
@@ -9,18 +10,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     
     let targetURL = URL(string: "https://opencode.ai/workspace/wrk_01KMY2B2MFPPDQ7XXAC1YSZNCR/billing")!
     
+    let intervals: [Int] = [1, 2, 5, 10, 15, 30, 60]
+    let intervalKey = "refreshIntervalMinutes"
+    
+    var refreshIntervalMinutes: Int {
+        let stored = UserDefaults.standard.integer(forKey: intervalKey)
+        return stored == 0 ? 5 : stored
+    }
+    
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
             button.title = "Loading..."
         }
         
-        let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "Refresh Balance", action: #selector(refreshBalance), keyEquivalent: "r"))
-        menu.addItem(NSMenuItem(title: "Show Web View", action: #selector(showAuthWindow), keyEquivalent: "s"))
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
-        statusItem.menu = menu
+        buildMenu()
         
         setupWebView()
         setupWindow()
@@ -28,8 +32,72 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         // Load the page
         refreshBalance()
         
-        // Refresh every 5 minutes (300 seconds)
-        timer = Timer.scheduledTimer(timeInterval: 300, target: self, selector: #selector(refreshBalance), userInfo: nil, repeats: true)
+        startTimer()
+    }
+    
+    func buildMenu() {
+        let menu = NSMenu()
+        menu.addItem(NSMenuItem(title: "Refresh Balance", action: #selector(refreshBalance), keyEquivalent: "r"))
+        menu.addItem(NSMenuItem(title: "Show Web View", action: #selector(showAuthWindow), keyEquivalent: "s"))
+        menu.addItem(NSMenuItem.separator())
+        
+        // Refresh interval submenu
+        let intervalItem = NSMenuItem(title: "Refresh Interval", action: nil, keyEquivalent: "")
+        let intervalMenu = NSMenu()
+        for minutes in intervals {
+            let title = minutes == 1 ? "1 minute" : "\(minutes) minutes"
+            let item = NSMenuItem(title: title, action: #selector(setInterval(_:)), keyEquivalent: "")
+            item.tag = minutes
+            item.state = (minutes == refreshIntervalMinutes) ? .on : .off
+            intervalMenu.addItem(item)
+        }
+        intervalItem.submenu = intervalMenu
+        menu.addItem(intervalItem)
+        
+        // Open at Login toggle
+        let loginItem = NSMenuItem(title: "Open at Login", action: #selector(toggleOpenAtLogin), keyEquivalent: "")
+        loginItem.state = isOpenAtLoginEnabled() ? .on : .off
+        menu.addItem(loginItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        statusItem.menu = menu
+    }
+    
+    func startTimer() {
+        timer?.invalidate()
+        let interval = TimeInterval(refreshIntervalMinutes * 60)
+        timer = Timer.scheduledTimer(timeInterval: interval, target: self, selector: #selector(refreshBalance), userInfo: nil, repeats: true)
+    }
+    
+    @objc func setInterval(_ sender: NSMenuItem) {
+        UserDefaults.standard.set(sender.tag, forKey: intervalKey)
+        startTimer()
+        buildMenu()
+    }
+    
+    // MARK: - Open at Login
+    
+    func isOpenAtLoginEnabled() -> Bool {
+        if #available(macOS 13.0, *) {
+            return SMAppService.mainApp.status == .enabled
+        }
+        return false
+    }
+    
+    @objc func toggleOpenAtLogin() {
+        if #available(macOS 13.0, *) {
+            do {
+                if SMAppService.mainApp.status == .enabled {
+                    try SMAppService.mainApp.unregister()
+                } else {
+                    try SMAppService.mainApp.register()
+                }
+            } catch {
+                NSLog("Failed to toggle login item: \(error)")
+            }
+            buildMenu()
+        }
     }
     
     func setupWebView() {
