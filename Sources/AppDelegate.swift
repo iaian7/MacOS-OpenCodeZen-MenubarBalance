@@ -226,18 +226,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func applyMenubarTitle() {
         guard let button = statusItem.button else { return }
+        button.image = nil
+        button.imagePosition = .noImage
+
         let enabledStates = Providers.all
             .filter { Providers.isEnabled($0.id) }
             .compactMap { providerStates[$0.id] }
 
         if enabledStates.isEmpty {
-            button.image = nil
             button.attributedTitle = NSAttributedString(string: "No providers")
             return
         }
 
         if enabledStates.count == 1 {
-            button.image = nil
             button.attributedTitle = NSAttributedString(
                 string: enabledStates[0].balance,
                 attributes: [.font: NSFont.menuBarFont(ofSize: 0)]
@@ -266,42 +267,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        button.attributedTitle = NSAttributedString(string: "")
-        button.title = ""
-        button.image = renderMenubarImage(lines: rowStrings)
-        button.imagePosition = .imageOnly
-    }
-
-    private func renderMenubarImage(lines: [String]) -> NSImage {
-        let fontSize: CGFloat = 9
-        let lineHeight: CGFloat = 10
+        let fontSize: CGFloat = 9.5
+        let lineHeight: CGFloat = 9
+        let verticalShift: CGFloat = -4
         let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
         let para = NSMutableParagraphStyle()
         para.lineSpacing = 0
         para.maximumLineHeight = lineHeight
         para.minimumLineHeight = lineHeight
         para.alignment = .left
+
         let attrs: [NSAttributedString.Key: Any] = [
             .font: font,
             .paragraphStyle: para,
-            .foregroundColor: NSColor.black
+            .baselineOffset: verticalShift
         ]
-        let text = lines.joined(separator: "\n")
-        let attributed = NSAttributedString(string: text, attributes: attrs)
-        let bounding = attributed.boundingRect(
-            with: NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude),
-            options: [.usesLineFragmentOrigin]
-        )
-        let width = ceil(bounding.width) + 2
-        let height: CGFloat = NSStatusBar.system.thickness
-        let image = NSImage(size: NSSize(width: width, height: height))
-        image.lockFocus()
-        let totalTextHeight = lineHeight * CGFloat(lines.count)
-        let y = (height - totalTextHeight) / 2
-        attributed.draw(in: NSRect(x: 1, y: y, width: width - 2, height: totalTextHeight))
-        image.unlockFocus()
-        image.isTemplate = true
-        return image
+        let text = rowStrings.joined(separator: "\n")
+        button.attributedTitle = NSAttributedString(string: text, attributes: attrs)
     }
 }
 

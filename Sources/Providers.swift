@@ -13,7 +13,7 @@ enum Providers {
             id: "opencode",
             name: "OpenCode Zen",
             abbreviation: "zn",
-            defaultURL: "https://opencode.ai/workspace/wrk_01KMY2B2MFPPDQ7XXAC1YSZNCR/billing"
+            defaultURL: "https://opencode.ai/workspace/billing"
         ),
         ProviderInfo(
             id: "anthropic",
