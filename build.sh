@@ -35,7 +35,7 @@ cat <<EOF > "$APP_DIR/Contents/Info.plist"
 EOF
 
 # Compile Swift code
-swiftc Sources/main.swift Sources/AppDelegate.swift -o "$MACOS_DIR/$APP_NAME"
+swiftc Sources/main.swift Sources/AppDelegate.swift Sources/Providers.swift Sources/ProvidersWindowController.swift -o "$MACOS_DIR/$APP_NAME"
 
 echo "Build complete: $APP_DIR"
 echo "You can launch it by running: open $APP_DIR"
