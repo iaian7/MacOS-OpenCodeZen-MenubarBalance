@@ -7,6 +7,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 	var timer: Timer?
 	var providerStates: [String: ProviderState] = [:]
 	var providersWindowController: ProvidersWindowController!
+	private var hiddenWindow: NSWindow!
 	
 	let intervals: [Int] = [1, 2, 5, 10, 15, 30, 60]
 	let intervalKey = "refreshIntervalMinutes"
@@ -22,8 +23,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 		statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 		statusItem.button?.title = "Loading…"
 		
+		// A realistic, off-screen viewport. SPAs (claude.ai, opencode.ai) gate their
+		// content on viewport size and won't render the balance into the DOM at 0×0,
+		// so the offscreen webviews must have real bounds for the launch-time scrape.
+		hiddenWindow = NSWindow(contentRect: NSRect(x: -10000, y: -10000, width: 1280, height: 900), styleMask: [], backing: .buffered, defer: true)
+
 		for info in Providers.all {
-			providerStates[info.id] = ProviderState(info: info, owner: self)
+			let state = ProviderState(info: info, owner: self)
+			providerStates[info.id] = state
+			if let content = hiddenWindow.contentView {
+				state.webView.frame = content.bounds
+				state.webView.autoresizingMask = [.width, .height]
+				content.addSubview(state.webView)
+			}
 		}
 		
 		providersWindowController = ProvidersWindowController(owner: self)
@@ -306,7 +318,7 @@ class ProviderState: NSObject, WKNavigationDelegate {
 	private func setupWebView() {
 		let config = WKWebViewConfiguration()
 		config.websiteDataStore = WKWebsiteDataStore.default()
-		webView = WKWebView(frame: .zero, configuration: config)
+		webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 1280, height: 900), configuration: config)
 		webView.navigationDelegate = self
 		webView.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
 	}
@@ -388,7 +400,7 @@ class ProviderState: NSObject, WKNavigationDelegate {
 			if let value = result as? String {
 				self.balance = value
 				self.owner?.providerStateDidUpdate(self)
-			} else if retryCount < 5 {
+			} else if retryCount < 8 {
 				DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
 					self.extractBalance(retryCount: retryCount + 1)
 				}

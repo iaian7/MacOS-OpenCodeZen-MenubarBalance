@@ -217,7 +217,11 @@ class ProvidersWindowController: NSWindowController, NSTableViewDataSource, NSTa
 			currentWebView = wv
 		}
 		
-		if state.webView.url == nil {
+		// Refresh on first view, and also if the balance never resolved (e.g. the
+		// offscreen scrape failed) — so surfacing the tab recovers it without the
+		// user having to manually reload the URL.
+		let bal = state.balance
+		if state.webView.url == nil || bal == "?" || bal == "…" {
 			state.refresh()
 		}
 	}
